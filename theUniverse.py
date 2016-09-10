@@ -23,15 +23,16 @@ from math import sinh, cosh, tanh, copysign, ceil, log10
 
 screenSize = 600, 600
 universePos = 0, 0
+controlsHeight = 55
 
 def universe_size(screenSize):
-    return screenSize[0], screenSize[1] - 100
+    return screenSize[0], screenSize[1] - controlsHeight
     
 def controls_pos(screenSize):
-    return 0, screenSize[1] - 100
+    return 0, screenSize[1] - controlsHeight
     
 def controls_size(screenSize):
-    return screenSize[0], 100
+    return screenSize[0], controlsHeight
     
 controlsPos = controls_pos(screenSize)
 
@@ -197,7 +198,7 @@ def make_line(universe, pos):
 
 
 #font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18) # for Pyinstaller
-font = pygame.freetype.Font(None, 18)
+font = pygame.freetype.Font(None, 14)
 
 class Button:
     def __init__(self, pos, size, text):
@@ -215,10 +216,10 @@ class Button:
         controls.blit(self.text, self.textpos) # put text on button
     
 # Create all buttons    
-lineButton   = Button((10, 10), (80, 35), "Lines")
-dotButton    = Button((10, 55), (80, 35), "Points")
-removeButton = Button((100, 10), (80, 35), "Remove") 
-clearButton  = Button((100, 55), (80, 35), "Clear")
+lineButton   = Button((5, 5), (60, 20), "Lines")
+dotButton    = Button((5, 30), (60, 20), "Points")
+removeButton = Button((70, 5), (60, 20), "Remove") 
+clearButton  = Button((70, 30), (60, 20), "Clear")
 
 buttons = (lineButton, dotButton, removeButton, clearButton) # All buttons
 
@@ -253,9 +254,9 @@ class Text_display: # Creates a place to display text
         pygame.draw.rect(controls, controlsBgColor, self.rect)    
         
         
-scrol_bar = Scrol_bar((200, 20), (screenSize[0] - 220, 30)) 
+scrol_bar = Scrol_bar((138, 8), (screenSize[0] - 138 - 8, 18)) 
     # one scrol bar to specify lorens transfomrations
-text_display = Text_display((200, 60), (screenSize[0] - 220, 30))
+text_display = Text_display((138, 8+18), (screenSize[0] - 138 - 8, 55-8-18))
     # one text display to show the related velocity change
     
 
@@ -471,7 +472,7 @@ while running:
                                             or event.key == pygame.K_RSHIFT):
             shift_is_down = False
             if is_drawing_line:
-                end = old_end
+                end = pygame.mouse.get_pos()
                 screen.blit(universe.surface, universePos)
                 color = line_color((start, end))
                 pygame.draw.line(screen, color, start, end, lineWidth)
@@ -489,8 +490,8 @@ while running:
             for button in buttons: 
                 button.draw() # draws button
                 
-            scrol_bar = Scrol_bar((200, 20), (event.size[0] - 220, 30)) 
-            text_display = Text_display((200, 60), (event.size[0] - 220, 30))          
+            scrol_bar = Scrol_bar((138, 8), (event.size[0] - 138 - 8, 18)) 
+            text_display = Text_display((138, 8+18), (event.size[0] - 138 - 8, 55-8-18))
             scrol_bar.draw(0) # draws scrol bare, with the handle in the center.
             screen.blit(controls, controlsPos)        
 
