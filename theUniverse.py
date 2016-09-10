@@ -16,18 +16,25 @@ import pygame.freetype
 pygame.freetype.init() # makes font work
 
 from operator import sub
-from math import sinh, cosh, tanh, copysign
+from math import sinh, cosh, tanh, copysign, ceil, log10
 
 ##########################################################
 # Defining grapichs options
 
 screenSize = 600, 600
-
-universeSize = 600, 500
 universePos = 0, 0
 
-controlesSize = 600, 500
-controlesPos = 0, 500
+def universe_size(screenSize):
+    return screenSize[0], screenSize[1] - 100
+    
+def controls_pos(screenSize):
+    return 0, screenSize[1] - 100
+    
+def controls_size(screenSize):
+    return screenSize[0], 100
+    
+controlsPos = controls_pos(screenSize)
+
 
 yellow = 240, 222, 5
 darkYellow = 50, 50, 0
@@ -56,7 +63,7 @@ lineWidth = 5
 dotRadius = 5
 lightconeLineWidth = lineWidth
 
-screen = pygame.display.set_mode(screenSize)
+screen = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
 
 ##############################################################
 # Defining math and such
@@ -189,19 +196,8 @@ def make_line(universe, pos):
 # Creating the GUI
 
 
-clock = pygame.time.Clock() # clock to have clock-ticks, to save on CPU
-
-running = True # Is program running? Assign "False" to quit.
-is_drawing_line = False # Is the user in the middle of drawin a line?
-shift_is_down = False # the shift key is down
-
-universe = Universe(universeSize) # create empty universe
-controls = pygame.Rect(controlesPos, controlesSize) # define control area
-
 #font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18) # for Pyinstaller
 font = pygame.freetype.Font(None, 18)
- 
-
 
 class Button:
     def __init__(self, pos, size, text):
@@ -212,17 +208,17 @@ class Button:
         
     def draw(self): # draws button on screen
         if self.is_active:
-            pygame.draw.rect(screen, activeButtonColor, self.rect)
+            pygame.draw.rect(controls, activeButtonColor, self.rect)
         else:
-            pygame.draw.rect(screen, buttonColor, self.rect)
+            pygame.draw.rect(controls, buttonColor, self.rect)
                     
-        screen.blit(self.text, self.textpos) # put text on button
+        controls.blit(self.text, self.textpos) # put text on button
     
 # Create all buttons    
-lineButton   = Button((10, 510), (80, 35), "Lines")
-dotButton    = Button((10, 555), (80, 35), "Points")
-removeButton = Button((100, 510), (80, 35), "Remove") 
-clearButton  = Button((100, 555), (80, 35), "Clear")
+lineButton   = Button((10, 10), (80, 35), "Lines")
+dotButton    = Button((10, 55), (80, 35), "Points")
+removeButton = Button((100, 10), (80, 35), "Remove") 
+clearButton  = Button((100, 55), (80, 35), "Clear")
 
 buttons = (lineButton, dotButton, removeButton, clearButton) # All buttons
 
@@ -240,43 +236,55 @@ class Scrol_bar:
         ''' draws the scrollbar, 
         where the handle is moved from the center 
         by the lenght "shift"'''
-        pygame.draw.rect(screen, darkGray, self.rect)
-        pygame.draw.rect(screen, lightGray, self.handle.move(shift, 0))
+        pygame.draw.rect(controls, darkGray, self.rect)
+        pygame.draw.rect(controls, lightGray, self.handle.move(shift, 0))
         
 class Text_display: # Creates a place to display text
     def __init__(self, pos, size):
         self.rect = pygame.Rect(pos, size)
         
     def display(self, text): # Display specified text
-        pygame.draw.rect(screen, controlsBgColor, self.rect)
+        pygame.draw.rect(controls, controlsBgColor, self.rect)
         text = font.render(text, textColor)[0]
         textpos = text.get_rect(center=self.rect.center).topleft
-        screen.blit(text, textpos)
+        controls.blit(text, textpos)
         
     def hide(self): # Erase any text
-        pygame.draw.rect(screen, controlsBgColor, self.rect)    
+        pygame.draw.rect(controls, controlsBgColor, self.rect)    
         
         
-scrol_bar = Scrol_bar((200, 520), (380, 30)) 
+scrol_bar = Scrol_bar((200, 20), (screenSize[0] - 220, 30)) 
     # one scrol bar to specify lorens transfomrations
-text_display = Text_display((200, 560), (380, 30))
+text_display = Text_display((200, 60), (screenSize[0] - 220, 30))
     # one text display to show the related velocity change
+    
 
-universe.draw() # draws universe
-screen.blit(universe.surface, universePos)
-
-pygame.draw.rect(screen, controlsBgColor, controls) # draws controls bacground
+controls = pygame.Surface(controls_size(screenSize))
+controls.fill(controlsBgColor)
 
 for button in buttons: 
     button.draw() # draws button
     
 scrol_bar.draw(0) # draws scrol bare, with the handle in the center.
 
+screen.blit(controls, controlsPos)
+
+
+universe = Universe(universe_size(screenSize)) # create empty 
+universe.draw() # draws universe
+screen.blit(universe.surface, universePos) # put on screen
+
 pygame.display.flip() # make all appear on screen
 
 
 ###################################################################
 # Running the program
+
+clock = pygame.time.Clock() # clock to have clock-ticks, to save on CPU
+
+running = True # Is program running? Assign "False" to quit.
+is_drawing_line = False # Is the user in the middle of drawin a line?
+shift_is_down = False # the shift key is down
 
 def remove(universe, pos):
     coord = pixel_to_spacetime(universe, pos)
@@ -316,11 +324,20 @@ def straighten_line(start, end):
 
 def in_the_universe(pos):
     return universe.surface.get_rect(topleft=universePos).collidepoint(pos)
-        
+    
+def my_round(frac):
+    if abs(frac) < 90:
+        return round(frac)
+    if abs(frac) < 99:
+        return round(frac,1)
+    if abs(frac) < 99.9:
+        return round(frac,2)
+    return round(frac, 2-ceil(log10(100-abs(frac))))
 
 while running:
     for event in pygame.event.get(): # what the user is dooing
         if event.type == pygame.QUIT:
+            #pygame.display.quit() # close window
             running = False # time to stop running program
             break # don't check more events
             
@@ -352,14 +369,15 @@ while running:
                     universe.draw()
                     screen.blit(universe.surface, universePos)
                     
-            elif scrol_bar.handle.collidepoint(event.pos): # click on scrol bar handle
+            elif scrol_bar.handle.move(controlsPos).collidepoint(event.pos): 
+                # click on scrol bar handle
                 scrol_bar.is_grabed = True
                 grab_pos = event.pos[0] # save x-pos of where it was grabed
                 shift = 0 # not draged yet
                     
             else: # click some where else
                 for button in buttons: # loop all buttons
-                    if button.rect.collidepoint(event.pos): 
+                    if button.rect.move(controlsPos).collidepoint(event.pos): 
                             # chek if we are on this button
                         button.is_active = not button.is_active # change is active
                         button.draw() # re-draw button
@@ -374,7 +392,7 @@ while running:
                         if is_drawing_line:
                             is_drawing_line = False # interups any half finiched line
                             screen.blit(universe.surface, universePos) # paint over half finiched line
-                            
+                        screen.blit(controls, controlsPos)    
                         break # no need to check other buttons
                         
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3: # a right click
@@ -386,23 +404,28 @@ while running:
             if scrol_bar.is_grabed: # interupts any lorentz transformation
                 scrol_bar.is_grabed = False 
                 scrol_bar.draw(0)
+                text_display.hide()
+                screen.blit(controls, controlsPos)
+                
                 universe.draw()
                 screen.blit(universe.surface, universePos) # paint over half finiched line
-                text_display.hide()
                                
         elif event.type == pygame.MOUSEBUTTONUP:
             if clearButton.is_active:
                 universe.clear() # celar universe
                 universe.draw() # re-draw universe
+                
                 screen.blit(universe.surface, universePos) # paint over half finiched line
                 clearButton.is_active = False # reset button
                 clearButton.draw() # re-draw button
+                screen.blit(controls, controlsPos)
             
             elif scrol_bar.is_grabed: # finalizes any lorentz transformation
                 scrol_bar.is_grabed = False
                 scrol_bar.draw(0)
                 universe.frame += 0.01 * shift
                 text_display.hide()
+                screen.blit(controls, controlsPos)
                     
         elif event.type == pygame.MOUSEMOTION:
             if is_drawing_line: 
@@ -431,8 +454,9 @@ while running:
                     
                 scrol_bar.draw(shift)
                 text_display.display("Instantly accelerate to "
-                                     + str(round(100 * tanh(0.01 * shift)))
+                                     + str(my_round(100 * tanh(0.01 * shift)))
                                      + "% of light speed.")
+                screen.blit(controls, controlsPos)
                                      
         elif event.type == pygame.KEYDOWN and (event.key == pygame.K_LSHIFT
                                             or event.key == pygame.K_RSHIFT):
@@ -451,7 +475,24 @@ while running:
                 screen.blit(universe.surface, universePos)
                 color = line_color((start, end))
                 pygame.draw.line(screen, color, start, end, lineWidth)
-                    
+                
+        elif event.type == pygame.VIDEORESIZE: # resize window
+            screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
+
+            universe.surface = pygame.Surface(universe_size(event.size))
+            universe.draw()
+            screen.blit(universe.surface, universePos)          
+            
+            controlsPos = controls_pos(event.size)
+            controls = pygame.Surface(controls_size(event.size))
+            controls.fill(controlsBgColor)
+            for button in buttons: 
+                button.draw() # draws button
+                
+            scrol_bar = Scrol_bar((200, 20), (event.size[0] - 220, 30)) 
+            text_display = Text_display((200, 60), (event.size[0] - 220, 30))          
+            scrol_bar.draw(0) # draws scrol bare, with the handle in the center.
+            screen.blit(controls, controlsPos)        
 
         pygame.display.flip() # show changes    
         
