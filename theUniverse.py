@@ -64,18 +64,18 @@ screen = pygame.display.set_mode(screenSize)
 class Universe:
     
     def get_origo(self):
-        return self.rect.center 
+        return self.surface.get_rect().center 
         # objects in the universe will use coorinates centered at origo
                 
     def draw_lightcone(self):
         x, y = self.get_origo()
         dist = min(x, y) # distance to cloest edge
 
-        pygame.draw.line(screen,lightconeColor, 
+        pygame.draw.line(self.surface,lightconeColor, 
                          (x-dist, y-dist), (x+dist, y+dist),
                          lightconeLineWidth)
                          
-        pygame.draw.line(screen, lightconeColor, 
+        pygame.draw.line(self.surface, lightconeColor, 
                          (x+dist, y-dist), (x-dist, y+dist),
                          lightconeLineWidth)
                                
@@ -84,14 +84,14 @@ class Universe:
         self.lines = [] # objets in the universe
         self.dots = []  # objets in the universe
         
-    def __init__(self, pos, size):
-        self.rect = pygame.Rect(pos, size) # Here be Universe
+    def __init__(self, size):
+        self.surface = pygame.Surface(size) # Here be Universe
         self.clear() # start empty
         
     def draw_in_frame(self, frame):
         ''' draws the universe and all objects in it, 
         in the specified lorents frame '''
-        pygame.draw.rect(screen, universeColor, self.rect)
+        self.surface.fill(universeColor)
         self.draw_lightcone()
             
         for line in self.lines:
@@ -100,12 +100,12 @@ class Universe:
             pos = tuple(spacetime_to_pixel(self, coord) 
                         for coord in coords)
                 # converts to pixle possition
-            pygame.draw.line(screen, line.color(), pos[0], pos[1], lineWidth)
+            pygame.draw.line(self.surface, line.color(), pos[0], pos[1], lineWidth)
                     
         for dot in self.dots:
             coord = dot.in_other_frame(frame)           
             pos = spacetime_to_pixel(self, coord)
-            pygame.draw.circle(screen, dotColor, pos, dotRadius)
+            pygame.draw.circle(self.surface, dotColor, pos, dotRadius)
 
         
     def draw(self):
@@ -195,9 +195,8 @@ running = True # Is program running? Assign "False" to quit.
 is_drawing_line = False # Is the user in the middle of drawin a line?
 shift_is_down = False # the shift key is down
 
-universe = Universe(universePos, universeSize) # create empty universe
+universe = Universe(universeSize) # create empty universe
 controls = pygame.Rect(controlesPos, controlesSize) # define control area
-border = pygame.Rect(controlesPos, (controlesSize[0], 8)) # to make it look nicer
 
 #font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18) # for Pyinstaller
 font = pygame.freetype.Font(None, 18)
@@ -264,6 +263,7 @@ text_display = Text_display((200, 560), (380, 30))
     # one text display to show the related velocity change
 
 universe.draw() # draws universe
+screen.blit(universe.surface, universePos)
 
 pygame.draw.rect(screen, controlsBgColor, controls) # draws controls bacground
 
@@ -314,6 +314,8 @@ def straighten_line(start, end):
         dx = copysign(dy,dx)
         return start[0] + dx, end[1]
 
+def in_the_universe(pos):
+    return universe.surface.get_rect(topleft=universePos).collidepoint(pos)
         
 
 while running:
@@ -325,7 +327,8 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # a left click
         
-            if universe.rect.collidepoint(event.pos): # a click in universe
+            if in_the_universe(event.pos): 
+                # a click in universe
                      
                 if dotButton.is_active:
                     make_dot(universe, event.pos) # make dot there
@@ -342,10 +345,12 @@ while running:
                     else:
                         start = event.pos # remember start of line
                         is_drawing_line = True # drawing in progress
+                        universe.draw() # prepare frechly drwan universe
                         
                 elif removeButton.is_active:
                     remove(universe, event.pos) # not finnished!
                     universe.draw()
+                    screen.blit(universe.surface, universePos)
                     
             elif scrol_bar.handle.collidepoint(event.pos): # click on scrol bar handle
                 scrol_bar.is_grabed = True
@@ -368,7 +373,7 @@ while running:
                         
                         if is_drawing_line:
                             is_drawing_line = False # interups any half finiched line
-                            universe.draw() # paint over half finiched line
+                            screen.blit(universe.surface, universePos) # paint over half finiched line
                             
                         break # no need to check other buttons
                         
@@ -376,18 +381,20 @@ while running:
         
             if is_drawing_line: # interups any half finiche line
                 is_drawing_line = False 
-                universe.draw()
+                screen.blit(universe.surface, universePos) # paint over half finiched line
             
             if scrol_bar.is_grabed: # interupts any lorentz transformation
                 scrol_bar.is_grabed = False 
                 scrol_bar.draw(0)
                 universe.draw()
+                screen.blit(universe.surface, universePos) # paint over half finiched line
                 text_display.hide()
                                
         elif event.type == pygame.MOUSEBUTTONUP:
             if clearButton.is_active:
                 universe.clear() # celar universe
                 universe.draw() # re-draw universe
+                screen.blit(universe.surface, universePos) # paint over half finiched line
                 clearButton.is_active = False # reset button
                 clearButton.draw() # re-draw button
             
@@ -399,18 +406,18 @@ while running:
                     
         elif event.type == pygame.MOUSEMOTION:
             if is_drawing_line: 
-                if universe.rect.collidepoint(event.pos):
+                if in_the_universe(event.pos):
                     end = event.pos
                     if shift_is_down:
                         old_end = end
                         end = straighten_line(start, end)
-                    universe.draw()
+                    screen.blit(universe.surface, universePos) 
                     color = line_color((start, end))
                     pygame.draw.line(screen, color, start, end, lineWidth)
                 else:
                     last_pos = tuple(map(sub, event.pos, event.rel))
-                    if universe.rect.collidepoint(last_pos):
-                        universe.draw()
+                    if in_the_universe(last_pos):
+                        screen.blit(universe.surface, universePos)
                         
             elif scrol_bar.is_grabed:
                 shift = event.pos[0] - grab_pos
@@ -420,10 +427,7 @@ while running:
                     shift = scrol_bar.max    
                 
                 universe.draw_in_frame(universe.frame + 0.01 * shift)
-                                
-                pygame.draw.rect(screen, controlsBgColor, controls) 
-                for button in buttons: 
-                    button.draw() # draws button
+                screen.blit(universe.surface, universePos)      
                     
                 scrol_bar.draw(shift)
                 text_display.display("Instantly accelerate to "
@@ -435,7 +439,7 @@ while running:
             shift_is_down = True
             if is_drawing_line:
                 end = straighten_line(start, end)
-                universe.draw()
+                screen.blit(universe.surface, universePos)
                 color = line_color((start, end))
                 pygame.draw.line(screen, color, start, end, lineWidth)
                 
@@ -444,14 +448,10 @@ while running:
             shift_is_down = False
             if is_drawing_line:
                 end = old_end
-                universe.draw()
+                screen.blit(universe.surface, universePos)
                 color = line_color((start, end))
                 pygame.draw.line(screen, color, start, end, lineWidth)
                     
-             
-        
-        pygame.draw.rect(screen, controlsBgColor, border) 
-        # paint over some spill over from universe to controls
 
         pygame.display.flip() # show changes    
         
