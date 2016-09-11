@@ -550,9 +550,20 @@ while running:
                 screen.blit(universe.surface, universePos)      
                     
                 scrol_bar.draw(shift)
-                text_display.display("Instantly accelerate to "
-                                     + str(my_round(100 * tanh(0.01 * shift)))
-                                     + "% of light speed.")
+                
+                
+                
+                if text_display.rect.width < 130:
+                    text_display.display(str(my_round(100 * tanh(0.01 * shift)))
+                                         + "% c")
+                                             
+                elif text_display.rect.width < 290:
+                    text_display.display(str(my_round(100 * tanh(0.01 * shift)))
+                                         + "% of light speed")
+                else:         
+                    text_display.display("Instantly accelerate to "
+                                         + str(my_round(100 * tanh(0.01 * shift)))
+                                         + "% of light speed.")
                 screen.blit(controls, controlsPos)                 
             
             elif is_drawing_line:
