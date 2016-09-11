@@ -11,7 +11,7 @@ font = pygame.freetype.Font(None, 14)
 
 from operator import sub
 from math import sinh, cosh, tanh, copysign, ceil, log10
-import json
+import json, os, sys, subprocess
 
 ##########################################################
 # Stuff to make Pyinstaller work
@@ -240,8 +240,18 @@ def draw_menu(mouse_pos):
     for menu_button in menu_list:
         menu_button.draw(mouse_pos)
         
+def show_message(text): # will showes message on the screen 
+    message_is_on = True
+    message_rect = pygame.Rect((0,0),(0,0))       
     
-        
+def help(): # Tries to opens the README
+    try:
+        if sys.platform == 'linux2' or sys.platform == 'linux':
+            subprocess.call(["xdg-open", "README.txt"])
+        else:
+            os.startfile(file)
+    except:
+        show_message("Sorry, cant help you")
 
 def universe_to_json(universe):
     points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
@@ -265,7 +275,11 @@ def json_to_universe(json_string):
     return universe
     
 
-        
+def save():
+    pass
+    
+def load():
+    pass
         
 ###################################################################
 # Creating the GUI 
@@ -357,6 +371,7 @@ running = True # Is program running? Assign "False" to quit.
 is_drawing_line = False # Is the user in the middle of drawin a line?
 shift_is_down = False # the shift key is down
 last_pos = (-1, -1) # pos for last MOUSEMOTION event. Put initial outside screen
+message_is_on = False
 
 def remove(universe, pos):
     coord = pixel_to_spacetime(universe, pos)
@@ -416,8 +431,20 @@ while running:
             
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # a left click
+            
+            if message_is_on and message_rect.collidepoint(event.pos):
+                screen.blit(universe.surface, universePos)
         
-            if in_the_universe(event.pos): 
+            elif menu_dict["Help"].rect.collidepoint(event.pos):
+                help()
+                
+            elif menu_dict["Save"].rect.collidepoint(event.pos):
+                save()
+                
+            elif menu_dict["Load"].rect.collidepoint(event.pos):
+                load()
+        
+            elif in_the_universe(event.pos): 
                 # a click in universe
                      
                 if pointButton.is_active:
