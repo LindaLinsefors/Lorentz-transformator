@@ -12,7 +12,7 @@ Note: This program is not finished. This manual describes how things are suppose
 
 
 
-The UNIVERSE
+the UNIVERSE
 
 This is a 1+1 dimensional universe, which means that we have one time dimension and one space dimension. Time dimension is up, and the space dimension is to the side. 
 
@@ -54,7 +54,7 @@ The "Saves" folder must be in the same location on you computer as the LorentzTr
 
 
 
-the LESS IMPORTANT INFORMATION
+some LESS IMPORTANT INFORMATION
 
 The save files are rely just text files written in json. But it is cool to have ones own extension. If you want, you can try specifying a new session directly as text, and then try to run it. I leave as an exercise to figure out the details of how to do this.
 
