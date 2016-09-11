@@ -4,7 +4,7 @@
 
 This is a user manual for the program LorentzTransformer.
 
-The LorentzTransformer is a visualisation tool to help you understand special relativity and Lorentz transformations. When you start the program you will see an empty 1+1 dimensional Universe, over some simple controls.
+LorentzTransformer is a visualisation tool to help you understand special relativity and Lorentz transformations. When you start the program you will see an empty 1+1 dimensional Universe, over some simple controls.
 
 This program visualizes the physics, but does not attempt to explain it. For an explanation of what is going on, ask internet or a physicist.
 
