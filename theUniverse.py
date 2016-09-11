@@ -1,22 +1,29 @@
 #! /usr/bin/env python
 
 ##########################################################
-# Stuff to make Pyinstaller work
-'''import packaging
-import packaging.version
-import packaging.specifiers
-import packaging.requirements
-import appdirs'''
-
-##########################################################
 # Imports that are accutally used in this program
 import pygame
 pygame.init() # probably not needed
 import pygame.freetype 
 pygame.freetype.init() # makes font work
+ 
+font = pygame.freetype.Font(None, 14)
 
 from operator import sub
 from math import sinh, cosh, tanh, copysign, ceil, log10
+import json
+
+##########################################################
+# Stuff to make Pyinstaller work
+'''
+import packaging
+import packaging.version
+import packaging.specifiers
+import packaging.requirements
+import appdirs
+
+font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18)
+'''   
 
 ##########################################################
 # Defining grapichs options
@@ -24,6 +31,7 @@ from math import sinh, cosh, tanh, copysign, ceil, log10
 screenSize = 600, 600
 universePos = 0, 0
 controlsHeight = 55
+menuPos = 0, 0
 
 def universe_size(screenSize):
     return screenSize[0], screenSize[1] - controlsHeight
@@ -53,15 +61,18 @@ buttonColor = lightGray
 activeButtonColor = darkGray
 textColor = black
 
+menuColor = lightGray
+menuActiveColor = gray
+
 universeColor = black # universe background color
 lightconeColor = darkYellow
 lightlikeColor = yellow
 spacelikeColor = red
 timelikeColor = green
-dotColor = blue
+pointColor = blue
 
 lineWidth = 5
-dotRadius = 5
+pointRadius = 5
 lightconeLineWidth = lineWidth
 
 screen = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
@@ -90,7 +101,7 @@ class Universe:
     def clear(self): # empty the Universe
         self.frame = 0 # lorents frame represented by a number     
         self.lines = [] # objets in the universe
-        self.dots = []  # objets in the universe
+        self.points = []  # objets in the universe
         
     def __init__(self, size):
         self.surface = pygame.Surface(size) # Here be Universe
@@ -110,10 +121,10 @@ class Universe:
                 # converts to pixle possition
             pygame.draw.line(self.surface, line.color(), pos[0], pos[1], lineWidth)
                     
-        for dot in self.dots:
-            coord = dot.in_other_frame(frame)           
+        for point in self.points:
+            coord = point.in_other_frame(frame)           
             pos = spacetime_to_pixel(self, coord)
-            pygame.draw.circle(self.surface, dotColor, pos, dotRadius)
+            pygame.draw.circle(self.surface, pointColor, pos, pointRadius)
 
         
     def draw(self):
@@ -140,7 +151,7 @@ def spacetime_to_pixel(universe, coord):
     y = int(round(origo[1] + coord[1]))
     return x, y
 
-class Dot:
+class Point:
     def __init__(self, frame, coord):
         self.coord = coord # space-time coordinate
         self.frame = frame 
@@ -151,12 +162,13 @@ class Dot:
         # gives space-time coordinates in display_frame
         
         
-def make_dot(universe, pos):
-    # takes the pixel possition of a point, and makes a Dot object  
-    dot = Dot(universe.frame, 
+def make_point(universe, pos):
+    # takes the pixel possition of a point, and makes a point object  
+    point = Point(universe.frame, 
               pixel_to_spacetime(universe, pos) )
-    universe.dots.append(dot) # adds objet to universe content
-    return dot  
+    universe.points.append(point) # adds objet to universe content
+    universe.draw() # uppdate picture of universe
+    return point  
     
 def line_color(coords):
     '''diffrent colors to show if the line is 
@@ -190,15 +202,73 @@ def make_line(universe, pos):
                    for point in pos) # convert to spacetime coordinates
     line = Line(universe.frame, coords)
     universe.lines.append(line) # adds objet to list
+    universe.draw() # uppdate picture of universe
     return line
+
+
+###################################################################
+# Menu: Help, Save and Load
+
+class MenuButton:
+    def __init__(self, name, pos):
+        text, rect = font.render(name, textColor)
+        self.text = text
+        self.rect = pygame.Rect(pos, (rect.width + 10, 20))
+        self.textpos = self.text.get_rect(center=self.rect.center).topleft
+        
+    def draw(self, mouse_pos):
+        if self.rect.collidepoint(mouse_pos):
+            pygame.draw.rect(screen, menuActiveColor, self.rect)
+        else:
+            pygame.draw.rect(screen, menuColor, self.rect)
+        screen.blit(self.text, self.textpos)
+
+menu_names = ("Help", "Save", "Load")
+menu_dict =  {}
+menu_list = [] 
+
+next_pos = menuPos
+for name in menu_names:
+    menu_button = MenuButton(name, next_pos)
+    menu_dict[name] = menu_button
+    menu_list.append(menu_button)
+    next_pos = menu_button.rect.topright
+    
+menu_rect = pygame.Rect(menuPos, (next_pos[0] - menuPos[0], 20))
+
+def draw_menu(mouse_pos):
+    for menu_button in menu_list:
+        menu_button.draw(mouse_pos)
+        
+    
+        
+
+def universe_to_json(universe):
+    points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
+    lines = [{'frame': line.frame, 'coords': line.coords} for line in universe.lines]
+    return json.loads({'frame': universe.frame, 
+                       'points': points,
+                       'lines': lines})
+                       
+def json_to_universe(json_string):
+    universe_dict = json.loads(json_string)
+    universeSize = universe_size(pygame.dsiplay.get_surface().get_rect().size)
+    universe = Universe(universeSize)
+    
+    universe.frame = universe_dict['frame']
+    
+    universe.points = [Point(point['frame'], point['coord']) 
+                        for point in universe_dict['points']]
+                        
+    universe.lines = [Lines(line['frame'], line['coords'])
+                        for line in universe_dict['lines']]
+    return universe
+    
+
         
         
 ###################################################################
-# Creating the GUI
-
-
-#font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18) # for Pyinstaller
-font = pygame.freetype.Font(None, 14)
+# Creating the GUI 
 
 class Button:
     def __init__(self, pos, size, text):
@@ -217,13 +287,13 @@ class Button:
     
 # Create all buttons    
 lineButton   = Button((5, 5), (60, 20), "Lines")
-dotButton    = Button((5, 30), (60, 20), "Points")
+pointButton    = Button((5, 30), (60, 20), "Points")
 removeButton = Button((70, 5), (60, 20), "Remove") 
 clearButton  = Button((70, 30), (60, 20), "Clear")
 
-buttons = (lineButton, dotButton, removeButton, clearButton) # All buttons
+buttons = (lineButton, pointButton, removeButton, clearButton) # All buttons
 
-drawingOptions = (lineButton, dotButton, removeButton) 
+drawingOptions = (lineButton, pointButton, removeButton) 
     # These buttons that can not be acctive simultaniously
 
 class Scrol_bar:
@@ -286,14 +356,15 @@ clock = pygame.time.Clock() # clock to have clock-ticks, to save on CPU
 running = True # Is program running? Assign "False" to quit.
 is_drawing_line = False # Is the user in the middle of drawin a line?
 shift_is_down = False # the shift key is down
+last_pos = (-1, -1) # pos for last MOUSEMOTION event. Put initial outside screen
 
 def remove(universe, pos):
     coord = pixel_to_spacetime(universe, pos)
-    for dot in universe.dots:
-        dot_coord = dot.in_other_frame(universe.frame)
-        dist_sq = (coord[0] - dot_coord[0])**2 + (coord[1] - dot_coord[1])**2
-        if dist_sq <= dotRadius**2:
-            universe.dots.remove(dot)
+    for point in universe.points:
+        point_coord = point.in_other_frame(universe.frame)
+        dist_sq = (coord[0] - point_coord[0])**2 + (coord[1] - point_coord[1])**2
+        if dist_sq <= pointRadius**2:
+            universe.points.remove(point)
             return 1
             
     for line in universe.lines:
@@ -324,7 +395,8 @@ def straighten_line(start, end):
         return start[0] + dx, end[1]
 
 def in_the_universe(pos):
-    return universe.surface.get_rect(topleft=universePos).collidepoint(pos)
+    return (universe.surface.get_rect(topleft=universePos).collidepoint(pos)
+            and not menu_rect.collidepoint(pos) )
     
 def my_round(frac):
     if abs(frac) < 90:
@@ -348,10 +420,10 @@ while running:
             if in_the_universe(event.pos): 
                 # a click in universe
                      
-                if dotButton.is_active:
-                    make_dot(universe, event.pos) # make dot there
-                    pygame.draw.circle(screen, dotColor, event.pos, dotRadius)
-                        # draw the dot
+                if pointButton.is_active:
+                    make_point(universe, event.pos) # make point there
+                    pygame.draw.circle(screen, pointColor, event.pos, pointRadius)
+                        # draw the point
                     
                 elif lineButton.is_active:
                     if is_drawing_line: # already makred start of line
@@ -362,8 +434,7 @@ while running:
                         is_drawing_line = False # line is now done
                     else:
                         start = event.pos # remember start of line
-                        is_drawing_line = True # drawing in progress
-                        universe.draw() # prepare frechly drwan universe
+                        is_drawing_line = True # drawing in progress 
                         
                 elif removeButton.is_active:
                     remove(universe, event.pos) # not finnished!
@@ -428,22 +499,9 @@ while running:
                 text_display.hide()
                 screen.blit(controls, controlsPos)
                     
-        elif event.type == pygame.MOUSEMOTION:
-            if is_drawing_line: 
-                if in_the_universe(event.pos):
-                    end = event.pos
-                    if shift_is_down:
-                        old_end = end
-                        end = straighten_line(start, end)
-                    screen.blit(universe.surface, universePos) 
-                    color = line_color((start, end))
-                    pygame.draw.line(screen, color, start, end, lineWidth)
-                else:
-                    last_pos = tuple(map(sub, event.pos, event.rel))
-                    if in_the_universe(last_pos):
-                        screen.blit(universe.surface, universePos)
-                        
-            elif scrol_bar.is_grabed:
+        elif event.type == pygame.MOUSEMOTION: 
+        
+            if scrol_bar.is_grabed:
                 shift = event.pos[0] - grab_pos
                 if shift < -scrol_bar.max:
                     shift = -scrol_bar.max
@@ -457,7 +515,28 @@ while running:
                 text_display.display("Instantly accelerate to "
                                      + str(my_round(100 * tanh(0.01 * shift)))
                                      + "% of light speed.")
-                screen.blit(controls, controlsPos)
+                screen.blit(controls, controlsPos)                 
+            
+            elif is_drawing_line:
+                if in_the_universe(event.pos):
+                    end = event.pos
+                    if shift_is_down:
+                        end = straighten_line(start, end)
+                    screen.blit(universe.surface, universePos) 
+                    color = line_color((start, end))
+                    pygame.draw.line(screen, color, start, end, lineWidth)
+                    
+                elif in_the_universe(last_pos):
+                    screen.blit(universe.surface, universePos)
+                    
+            if menu_rect.collidepoint(event.pos):
+                draw_menu(event.pos)
+                
+            elif not is_drawing_line and menu_rect.collidepoint(last_pos):
+                screen.blit(universe.surface,universePos)
+            
+            last_pos = event.pos      
+
                                      
         elif event.type == pygame.KEYDOWN and (event.key == pygame.K_LSHIFT
                                             or event.key == pygame.K_RSHIFT):
