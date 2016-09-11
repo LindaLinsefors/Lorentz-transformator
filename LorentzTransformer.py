@@ -104,6 +104,7 @@ class Universe:
         self.points = []  # objets in the universe
         
     def __init__(self, size):
+        self.show_lightcone = True # show lightcone as default
         self.surface = pygame.Surface(size) # Here be Universe
         self.clear() # start empty
         
@@ -111,7 +112,9 @@ class Universe:
         ''' draws the universe and all objects in it, 
         in the specified lorents frame '''
         self.surface.fill(universeColor)
-        self.draw_lightcone()
+        
+        if self.show_lightcone:
+            self.draw_lightcone()
             
         for line in self.lines:
             coords = line.in_other_frame(frame)
@@ -223,7 +226,7 @@ class MenuButton:
             pygame.draw.rect(screen, menuColor, self.rect)
         screen.blit(self.text, self.textpos)
 
-menu_names = ("Help", "Save", "Load")
+menu_names = ("Help", "Save", "Load", "Show/Hide lightcone")
 menu_dict =  {}
 menu_list = [] 
 
@@ -257,6 +260,7 @@ def universe_to_json(universe):
     points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
     lines = [{'frame': line.frame, 'coords': line.coords} for line in universe.lines]
     return json.loads({'frame': universe.frame, 
+                       'show_lightcone': universe.show_lightcone,
                        'points': points,
                        'lines': lines})
                        
@@ -266,6 +270,7 @@ def json_to_universe(json_string):
     universe = Universe(universeSize)
     
     universe.frame = universe_dict['frame']
+    universe.show_lightcone = universe_dict['show_lightcone']
     
     universe.points = [Point(point['frame'], point['coord']) 
                         for point in universe_dict['points']]
@@ -419,7 +424,7 @@ def my_round(frac):
     if abs(frac) < 99:
         return round(frac,1)
     if abs(frac) < 99.9:
-        return round(frac,2)
+        return round(frac,2)#
     return round(frac, 2-ceil(log10(100-abs(frac))))
 
 while running:
@@ -443,6 +448,12 @@ while running:
                 
             elif menu_dict["Load"].rect.collidepoint(event.pos):
                 load()
+                
+            elif menu_dict["Show/Hide lightcone"].rect.collidepoint(event.pos):
+                universe.show_lightcone = not universe.show_lightcone
+                universe.draw()
+                screen.blit(universe.surface, universePos)
+                draw_menu(event.pos)
         
             elif in_the_universe(event.pos): 
                 # a click in universe
