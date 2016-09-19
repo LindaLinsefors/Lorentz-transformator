@@ -6,11 +6,18 @@ import pygame
 pygame.init() # probably not needed
 import pygame.freetype 
 pygame.freetype.init() # makes font work
- 
+
+bigfont = pygame.freetype.Font(None, 20)
 font = pygame.freetype.Font(None, 14)
+
+import tkinter
+import tkinter.filedialog
+tkinter.Tk().withdraw() # to not have save and load dialog window, hanging around
+
 
 from operator import sub
 from math import sinh, cosh, tanh, copysign, ceil, log10
+import re, random
 import json, os, sys, subprocess
 
 ##########################################################
@@ -244,22 +251,26 @@ def draw_menu(mouse_pos):
         menu_button.draw(mouse_pos)
         
 def show_message(text): # will showes message on the screen 
-    message_is_on = True
-    message_rect = pygame.Rect((0,0),(0,0))       
+    text, rect = bigfont.render(text, textColor)
+    rect.center = screen.get_rect().center
+    rect.move_ip(random.randint(-15,15), random.randint(-15,15))
+    pygame.draw.rect(screen, gray, rect.inflate(30,30))
+    pygame.draw.rect(screen, lightGray, rect.inflate(20,20))
+    screen.blit(text, rect.topleft)
     
 def help(): # Tries to opens the README
     try:
         if sys.platform == 'linux2' or sys.platform == 'linux':
             subprocess.call(["xdg-open", "README.txt"])
         else:
-            os.startfile(file)
+            os.startfile("README.txt")
     except:
         show_message("Sorry, cant help you")
 
 def universe_to_json(universe):
     points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
     lines = [{'frame': line.frame, 'coords': line.coords} for line in universe.lines]
-    return json.loads({'frame': universe.frame, 
+    return json.dumps({'frame': universe.frame, 
                        'show_lightcone': universe.show_lightcone,
                        'points': points,
                        'lines': lines})
@@ -281,10 +292,23 @@ def json_to_universe(json_string):
     
 
 def save():
-    pass
+    if not os.path.exists('Saves/'):
+        os.mkdir("Saves")
+    file = tkinter.filedialog.asksaveasfile(defaultextension=".lor", initialdir = "Saves")
+    if file:
+        file.write(universe_to_json(universe))
+        file.close()
+        show_message('You have saved this Universe')
     
+        
+
 def load():
-    pass
+    saves = find_saves()
+    if saves:
+        load_menu = LoadMenu(saves)  
+    else:
+        show_message('There is nothing to load')
+        
         
 ###################################################################
 # Creating the GUI 
@@ -376,7 +400,7 @@ running = True # Is program running? Assign "False" to quit.
 is_drawing_line = False # Is the user in the middle of drawin a line?
 shift_is_down = False # the shift key is down
 last_pos = (-1, -1) # pos for last MOUSEMOTION event. Put initial outside screen
-message_is_on = False
+last_save_or_load = None
 
 def remove(universe, pos):
     coord = pixel_to_spacetime(universe, pos)
@@ -436,11 +460,8 @@ while running:
             
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # a left click
-            
-            if message_is_on and message_rect.collidepoint(event.pos):
-                screen.blit(universe.surface, universePos)
         
-            elif menu_dict["Help"].rect.collidepoint(event.pos):
+            if menu_dict["Help"].rect.collidepoint(event.pos):
                 help()
                 
             elif menu_dict["Save"].rect.collidepoint(event.pos):
