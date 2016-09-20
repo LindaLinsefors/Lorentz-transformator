@@ -267,27 +267,10 @@ def help(): # Tries to opens the README
     except:
         show_message("Sorry, cant help you")
 
-def universe_to_json(universe):
-    points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
-    lines = [{'frame': line.frame, 'coords': line.coords} for line in universe.lines]
-    return json.dumps({'frame': universe.frame, 
-                       'show_lightcone': universe.show_lightcone,
-                       'points': points,
-                       'lines': lines})
+    
                        
 def json_to_universe(json_string):
-    universe_dict = json.loads(json_string)
-    universeSize = universe_size(pygame.dsiplay.get_surface().get_rect().size)
-    universe = Universe(universeSize)
-    
-    universe.frame = universe_dict['frame']
-    universe.show_lightcone = universe_dict['show_lightcone']
-    
-    universe.points = [Point(point['frame'], point['coord']) 
-                        for point in universe_dict['points']]
-                        
-    universe.lines = [Lines(line['frame'], line['coords'])
-                        for line in universe_dict['lines']]
+
     return universe
     
 
@@ -296,20 +279,41 @@ def save():
         os.mkdir("Saves")
     file = tkinter.filedialog.asksaveasfile(defaultextension=".lor", initialdir = "Saves")
     if file:
-        file.write(universe_to_json(universe))
+        points = [{'frame': point.frame, 'coord': point.coord} for point in universe.points]
+        lines = [{'frame': line.frame, 'coords': line.coords} for line in universe.lines]
+        json.dump({ 'frame': universe.frame, 
+                    'show_lightcone': universe.show_lightcone,
+                    'points': points,
+                    'lines': lines}, file, indent=4)
         file.close()
-        show_message('You have saved this Universe')
-    
-        
+          
 
 def load():
-    saves = find_saves()
-    if saves:
-        load_menu = LoadMenu(saves)  
-    else:
-        show_message('There is nothing to load')
-        
-        
+    file = tkinter.filedialog.askopenfile(defaultextension=".lor", initialdir = "Saves")
+    if file:
+        try:
+            universe_dict = json.load(file)
+            universeSize = universe_size(pygame.display.get_surface().get_rect().size)
+            
+            global universe # So that I can modify universe
+            universe = Universe(universeSize)
+
+            universe.frame = universe_dict['frame']
+            universe.show_lightcone = universe_dict['show_lightcone']
+
+            universe.points = [Point(point['frame'], point['coord']) 
+                                for point in universe_dict['points']]
+                                
+            universe.lines = [Line(line['frame'], line['coords'])
+                                for line in universe_dict['lines']]
+            
+        except:
+            show_message("Unable to load that file")
+         
+        universe.draw()
+            
+                               
+
 ###################################################################
 # Creating the GUI 
 
