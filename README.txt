@@ -42,13 +42,13 @@ the HIDDEN MENU
 
 In the top left corner is a hidden menu, that will appear if you hover the mouse over it.
 
-"Help" - opens this document, if you have not moved it, or something.
-
-"Save" - saves your current session.
-
-"Load" - let you load a previous session.
-
-"Show/Hide light-cone" - click and find out.
+    "Help" - opens this document, if you have not moved it, or something.
+    
+    "Save" - saves your current session.
+    
+    "Load" - let you load a previous session.
+    
+    "Show/Hide light-cone" - click and find out.
 
 Sessions are saved as .lor files in the "Saves" folder. You can share your saved sessions with others, by copying the .lor file in to their "saves" folder.
 
