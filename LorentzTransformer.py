@@ -1,56 +1,53 @@
 #! /usr/bin/env python
 
 ##########################################################
-# Imports that are accutally used in this program
+
 import pygame
-pygame.init() # probably not needed
+pygame.init() # I don't know what it does or if it is needed for this program
 import pygame.freetype 
 pygame.freetype.init() # makes font work
 
-bigfont = pygame.freetype.Font(None, 20)
-font = pygame.freetype.Font(None, 14)
 
-import tkinter
-import tkinter.filedialog
-tkinter.Tk().withdraw() # to not have save and load dialog window, hanging around
+import tkinter # tkinter is only used to choose files when loading and saving
+import tkinter.filedialog 
+tkinter.Tk().withdraw() # stops the save and load dialogue windows from hanging around
 
 
 from operator import sub
-from math import sinh, cosh, tanh, copysign, ceil, log10
-import re, random
-import json, os, sys, subprocess
+from math import sinh, cosh, tanh, copysign, ceil, log10 # math is nice :)
+import random, json, os, sys, subprocess
+
 
 ##########################################################
-# Stuff to make Pyinstaller work
-'''
-import packaging
-import packaging.version
-import packaging.specifiers
-import packaging.requirements
-import appdirs
+# Defining graphics options
 
-font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 18)
-'''   
+screenSize = 600, 600 # Initial screen size. Can be changed while running.
+universePos = 0, 0 # Position of top left corner of the universe
+controlsHeight = 55 # Thickness of control panel.
 
-##########################################################
-# Defining grapichs options
+# A hidden horizontal menu that appear when hovered over
+menuPos = 0, 0 # Position of top left corner of menu
+menuHeight = 20 # Thickness of menu
+menuMargin = 10 # Space between text is 2*menuMarign
 
-screenSize = 600, 600
-universePos = 0, 0
-controlsHeight = 55
-menuPos = 0, 0
-
-def universe_size(screenSize):
+'''Since the screen size can change while running the program
+this definitions needs to be dynamic'''
+def universe_size(screenSize): 
+    # Let the Universe fill all space that is not controls
     return screenSize[0], screenSize[1] - controlsHeight
     
 def controls_pos(screenSize):
+    # Let the controls be at the bottom of the program window
     return 0, screenSize[1] - controlsHeight
     
 def controls_size(screenSize):
+    # Let the controls be as wide as the program window
     return screenSize[0], controlsHeight
     
 controlsPos = controls_pos(screenSize)
 
+font = pygame.freetype.Font(None, 14) # Used for buttons, menu and speed display
+bigfont = pygame.freetype.Font(None, 20) # Used for special messages 
 
 yellow = 240, 222, 5
 darkYellow = 50, 50, 0
@@ -82,16 +79,35 @@ lineWidth = 5
 pointRadius = 5
 lightconeLineWidth = lineWidth
 
-screen = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
+
+##########################################################
+# Stuff to make Pyinstaller work
+# There are probably more fixes needed...
+
+'''
+import packaging
+import packaging.version
+import packaging.specifiers
+import packaging.requirements
+import appdirs
+
+font = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 14)
+bigfont = pygame.freetype.Font('/home/tilia/anaconda3/lib/python3.5/site-packages/pygame/freesansbold.ttf', 20)
+''' 
+
 
 ##############################################################
-# Defining math and such
+# The universe, the objects (points and lines) 
+# and the Lorentz-transform
 
 class Universe:
     
     def get_origo(self):
         return self.surface.get_rect().center 
-        # objects in the universe will use coorinates centered at origo
+        # objects in the universe will use coordinates centerd at origo
+        
+    def get_origo_on_screen(self):
+        return self.surface.get_rect(topleft = universePos).center
                 
     def draw_lightcone(self):
         x, y = self.get_origo()
@@ -106,18 +122,18 @@ class Universe:
                          lightconeLineWidth)
                                
     def clear(self): # empty the Universe
-        self.frame = 0 # lorents frame represented by a number     
-        self.lines = [] # objets in the universe
-        self.points = []  # objets in the universe
+        self.frame = 0 # Lorentz frame represented by a number     
+        self.lines = [] # objects in the universe
+        self.points = []  # objects in the universe
         
     def __init__(self, size):
-        self.show_lightcone = True # show lightcone as default
+        self.show_lightcone = True # show light-cone as default
         self.surface = pygame.Surface(size) # Here be Universe
         self.clear() # start empty
         
     def draw_in_frame(self, frame):
         ''' draws the universe and all objects in it, 
-        in the specified lorents frame '''
+        in the specified Lorentz frame '''
         self.surface.fill(universeColor)
         
         if self.show_lightcone:
@@ -125,63 +141,45 @@ class Universe:
             
         for line in self.lines:
             coords = line.in_other_frame(frame)
-                # convert to specified lorentz frame
-            pos = tuple(spacetime_to_pixel(self, coord) 
+                # convert to specified Lorentz frame
+            pos = tuple(space_time_to_pixel(self, coord) 
                         for coord in coords)
-                # converts to pixle possition
+                # converts to pixel position
             pygame.draw.line(self.surface, line.color(), pos[0], pos[1], lineWidth)
                     
         for point in self.points:
             coord = point.in_other_frame(frame)           
-            pos = spacetime_to_pixel(self, coord)
+            pos = space_time_to_pixel(self, coord)
             pygame.draw.circle(self.surface, pointColor, pos, pointRadius)
 
         
-    def draw(self):
-        # draws the unierse and all objets in int
+    def draw(self): # draws the universe and all objects in it
         self.draw_in_frame(self.frame)
         
+    def show(self): # puts the last drawn version of the universe on the screen
+        screen.blit(self.surface, universePos)
         
-def lorentz_transform(coord, frame_diff): 
+        
+def Lorentz_transform(coord, frame_diff): 
     sh, ch = sinh(frame_diff), cosh(frame_diff)
     t, r = coord  
     return (ch*t - sh*r, 
            -sh*t + ch*r)
     
-def pixel_to_spacetime(universe, pos):
-    # takes pixle position and gives space-time coordinates 
-    origo = universe.get_origo()
-    t = -(pos[0] - origo[0]) # time coordinate
-    r = pos[1] - origo[1] # space coordinate
-    return t, r
-    
-def spacetime_to_pixel(universe, coord):
-    origo = universe.get_origo()
-    x = int(round(origo[0] - coord[0]))
-    y = int(round(origo[1] + coord[1]))
-    return x, y
 
 class Point:
     def __init__(self, frame, coord):
         self.coord = coord # space-time coordinate
         self.frame = frame 
-            # the lorentz frame in which the object is defined
+            # the Lorentz frame in which the object is defined
         
     def in_other_frame(self, display_frame):
-        return lorentz_transform(self.coord, display_frame - self.frame)
+        return Lorentz_transform(self.coord, display_frame - self.frame)
         # gives space-time coordinates in display_frame
         
-        
-def make_point(universe, pos):
-    # takes the pixel possition of a point, and makes a point object  
-    point = Point(universe.frame, 
-              pixel_to_spacetime(universe, pos) )
-    universe.points.append(point) # adds objet to universe content
-    universe.draw() # uppdate picture of universe
-    return point  
     
 def line_color(coords):
-    '''diffrent colors to show if the line is 
+    '''different colors to show if the line is 
     time-like, light-like or space like'''
     time  = abs( coords[1][1] - coords[0][1] )
     space = abs( coords[1][0] - coords[0][0] )
@@ -195,62 +193,122 @@ def line_color(coords):
     
 class Line:
     def __init__(self, frame, coords):
-        self.frame = frame
-        self.coords = coords # end point coordinates
+        self.frame = frame 
+            # the Lorentz frame in which the object is defined
+        self.coords = coords # coordinates for the two end points
         
     def in_other_frame(self, display_frame):
-        return tuple(lorentz_transform(coord, display_frame - self.frame)
+        return tuple(Lorentz_transform(coord, display_frame - self.frame)
                      for coord in self.coords )
     
     def color(self):
         return line_color(self.coords)
+        
+        
+##################################################################
+# Relating position on the screen with coordinates in the Universe
 
+def pixel_to_space_time(universe, pos):
+    ''' takes pixel position on the screen and gives 
+    space-time coordinates in the universe '''
+    origo = universe.get_origo()
+    t = -(pos[0] - origo[0]) # time coordinate
+    r = pos[1] - origo[1] # space coordinate
+    return t, r
+    
+def space_time_to_pixel(universe, coord):
+    ''' takes space-time coordinates in universe
+    and gives pixel coordinates on universe.surface '''
+    origo = universe.get_origo_on_screen()
+    x = int(round(origo[0] - coord[0]))
+    y = int(round(origo[1] + coord[1]))
+    return x, y
+
+
+##################################################################
+# Creating and destroying lines and points
+
+def make_point(universe, pos):
+    # takes the pixel position of a point, and makes a point object  
+    point = Point(universe.frame, pixel_to_space_time(universe, pos) )
+    universe.points.append(point) # adds object to universe content
+    universe.draw() # update picture of universe
+    return point 
             
 def make_line(universe, pos):
-    # takes a tuple of two pixle possitions and makes a Line object
-    coords = tuple(pixel_to_spacetime(universe, point) 
-                   for point in pos) # convert to spacetime coordinates
+    # takes a tuple of two pixel positions and makes a Line object
+    coords = tuple(pixel_to_space_time(universe, point) 
+                   for point in pos) # convert to space-time coordinates
     line = Line(universe.frame, coords)
-    universe.lines.append(line) # adds objet to list
-    universe.draw() # uppdate picture of universe
+    universe.lines.append(line) # adds object to list
+    universe.draw() # update picture of universe
     return line
+    
+    
+def straighten_line(start, end): 
+    ''' Aids the user in drawing perfectly 
+    horizontal, vertical or exactly diagonal line '''
+    dx = end[0] - start[0]
+    dy = end[1] - start[1]
+    if abs(dx) < abs(dy)/2:
+        return start[0], end[1]
+    elif abs(dy) < abs(dx)/2:
+        return end[0], start[1]
+    else: 
+        dx = copysign(dy,dx)
+        return start[0] + dx, end[1]
+    
+def remove(universe, pos):
+    ''' removes any point or line in the universe that are on position pos'''
+     
+    coord = pixel_to_space_time(universe, pos)
+    for point in universe.points:
+        point_coord = point.in_other_frame(universe.frame)
+        dist_sq = (coord[0] - point_coord[0])**2 + (coord[1] - point_coord[1])**2
+        if dist_sq <= pointRadius**2:
+            universe.points.remove(point)
+            return 1 # This return value means that a point was removed
+            
+    for line in universe.lines:
+        line_coords = line.in_other_frame(universe.frame) 
+        if line_coords[1][0] - line_coords[0][0] == 0:
+            if (coord[0] - line_coords[0][0] <= lineWidth/2
+                and coord[1] <= max(line_coords[0][1], line_coords[1][1])
+                and coord[1] >= min(line_coords[0][1], line_coords[1][1])):
+                universe.lines.remove(line)
+                return 2 # This return value means that a line was removed
+        
+        elif (coord[0] <= max(line_coords[0][0], line_coords[1][0]) + lineWidth/2
+            and coord[0] >= min(line_coords[0][0], line_coords[1][0]) - lineWidth/2
+            and abs(coord[1] 
+                    - (line_coords[0][1] 
+                    + (coord[0] - line_coords[0][0])*(line_coords[1][1] - line_coords[0][1])/(line_coords[1][0] - line_coords[0][0]))
+                   ) <= lineWidth/2
+             ):
+            universe.lines.remove(line)
+            return 2 # This return value means that a line was removed
+    return 0 # This return value means that noting was removed  
+    
 
+##################################################################
+# Miscellaneous useful stuff
+
+def center(rect, surface):
+    ''' returns the pos for putting surface in the center of rect
+    good for centering text'''
+    return surface.get_rect(center = rect.center).topleft
+    
 
 ###################################################################
-# Menu: Help, Save and Load
+# Menu: Help, Save, Load, Show/Hide light-cone
 
-class MenuButton:
-    def __init__(self, name, pos):
-        text, rect = font.render(name, textColor)
-        self.text = text
-        self.rect = pygame.Rect(pos, (rect.width + 10, 20))
-        self.textpos = self.text.get_rect(center=self.rect.center).topleft
-        
-    def draw(self, mouse_pos):
-        if self.rect.collidepoint(mouse_pos):
-            pygame.draw.rect(screen, menuActiveColor, self.rect)
-        else:
-            pygame.draw.rect(screen, menuColor, self.rect)
-        screen.blit(self.text, self.textpos)
+''' 
+This section of the code defines a hidden menu in the top left corner of the screen
+which becomes visible when the mouse hovers over this area.
+'''
 
-menu_names = ("Help", "Save", "Load", "Show/Hide lightcone")
-menu_dict =  {}
-menu_list = [] 
 
-next_pos = menuPos
-for name in menu_names:
-    menu_button = MenuButton(name, next_pos)
-    menu_dict[name] = menu_button
-    menu_list.append(menu_button)
-    next_pos = menu_button.rect.topright
-    
-menu_rect = pygame.Rect(menuPos, (next_pos[0] - menuPos[0], 20))
-
-def draw_menu(mouse_pos):
-    for menu_button in menu_list:
-        menu_button.draw(mouse_pos)
-        
-def show_message(text): # will showes message on the screen 
+def show_message(text): # will shows message on the screen 
     text, rect = bigfont.render(text, textColor)
     rect.center = screen.get_rect().center
     rect.move_ip(random.randint(-15,15), random.randint(-15,15))
@@ -265,14 +323,7 @@ def help(): # Tries to opens the README
         else:
             os.startfile("README.txt")
     except:
-        show_message("Sorry, cant help you")
-
-    
-                       
-def json_to_universe(json_string):
-
-    return universe
-    
+        show_message("Sorry, cant help you")   
 
 def save():
     if not os.path.exists('Saves/'):
@@ -309,20 +360,68 @@ def load():
             
         except:
             show_message("Unable to load that file")
-         
+                     
         universe.draw()
-            
-                               
+        
+
+def show_or_hide_lightcone():
+    global universe
+    universe.show_lightcone = not universe.show_lightcone
+    universe.draw()
+    universe.show()
+    draw_menu(event.pos)
+
+
+class MenuButton:
+    def __init__(self, name, pos, effect):
+        text, rect = font.render(name, textColor) # render label text
+        self.text = text
+        self.rect = pygame.Rect(pos, (rect.width + menuMargin, menuHeight)) 
+            # Button area
+        self.textpos = center(self.rect, self.text) # text in the center        
+        self.effect = effect # what happens when clicked
+        
+    def draw(self, pos):
+        if self.rect.collidepoint(pos):
+            pygame.draw.rect(screen, menuActiveColor, self.rect)
+        else:
+            pygame.draw.rect(screen, menuColor, self.rect)
+        screen.blit(self.text, self.textpos)
+        
+    def do(self):
+        self.effect()
+
+menu_options = (("Help", help), # menu options (label, effect)
+                ("Save", save), 
+                ("Load", load), 
+                ("Show/Hide light-cone", show_or_hide_lightcone))
+                
+menu_list = [] # List of menu buttons, added when created
+
+next_pos = menuPos # pos of fist menu button
+for name, effect in menu_options: # Creates all menu buttons
+    menu_button = MenuButton(name, next_pos, effect)
+    menu_list.append(menu_button)
+    next_pos = menu_button.rect.topright
+    
+menu_rect = pygame.Rect(menuPos, (next_pos[0] - menuPos[0], 20)) # Menu area
+
+def draw_menu(pos):
+    for menu_button in menu_list:
+        menu_button.draw(pos)
+        
 
 ###################################################################
 # Creating the GUI 
+
+controls = pygame.Surface(controls_size(screenSize)) # The control panel area
 
 class Button:
     def __init__(self, pos, size, text):
         self.rect = pygame.Rect(pos, size)
         self.text = font.render(text, textColor)[0]
         self.is_active = False
-        self.textpos = self.text.get_rect(center=self.rect.center).topleft
+        self.textpos = center(self.rect, self.text)
         
     def draw(self): # draws button on screen
         if self.is_active:
@@ -332,67 +431,96 @@ class Button:
                     
         controls.blit(self.text, self.textpos) # put text on button
     
-# Create all buttons    
+# Create all buttons
 lineButton   = Button((5, 5), (60, 20), "Lines")
-pointButton    = Button((5, 30), (60, 20), "Points")
+pointButton  = Button((5, 30), (60, 20), "Points")
 removeButton = Button((70, 5), (60, 20), "Remove") 
 clearButton  = Button((70, 30), (60, 20), "Clear")
 
 buttons = (lineButton, pointButton, removeButton, clearButton) # All buttons
 
 drawingOptions = (lineButton, pointButton, removeButton) 
-    # These buttons that can not be acctive simultaniously
+    # These buttons that can not be active simultaneously
 
-class Scrol_bar:
+class Scroll_bar:
     def __init__(self, pos, size):
         self.rect = pygame.Rect(pos, size)
         self.is_grabed = False
         self.max = int((size[0] - size[1])/2)
         self.handle = pygame.Rect((pos[0] + self.max, pos[1]), (size[1], size[1]))
+        self.grab_pos = None # x-pos for wher scrollbar was grabed
            
     def draw(self, shift): 
         ''' draws the scrollbar, 
         where the handle is moved from the center 
-        by the lenght "shift"'''
+        by the length "shift"'''
         pygame.draw.rect(controls, darkGray, self.rect)
         pygame.draw.rect(controls, lightGray, self.handle.move(shift, 0))
         
-class Text_display: # Creates a place to display text
+        
+def my_round(frac): 
+    ''' round of the speed value to a sensible number of decimals
+    this means more decimals when closer to light speed '''
+    if abs(frac) < 90:
+        return round(frac)
+    if abs(frac) < 99:
+        return round(frac,1)
+    if abs(frac) < 99.9:
+        return round(frac,2)
+    return round(frac, 2-ceil(log10(100-abs(frac))))
+    
+        
+class Speed_display: # Creates a place to display text
     def __init__(self, pos, size):
         self.rect = pygame.Rect(pos, size)
-        
-    def display(self, text): # Display specified text
-        pygame.draw.rect(controls, controlsBgColor, self.rect)
-        text = font.render(text, textColor)[0]
-        textpos = text.get_rect(center=self.rect.center).topleft
-        controls.blit(text, textpos)
-        
+               
     def hide(self): # Erase any text
         pygame.draw.rect(controls, controlsBgColor, self.rect)    
         
+    def show(self, shift): # Shows the relative velocity    
+        if self.rect.width < 130:
+            text = str(my_round(100 * tanh(0.01 * shift))) + "% c"
+                                     
+        elif self.rect.width < 290:
+            text = str(my_round(100 * tanh(0.01 * shift))) + "% of light speed"
+            
+        else:         
+            text = ("Instantly accelerate to "
+                                 + str(my_round(100 * tanh(0.01 * shift)))
+                                 + "% of light speed.")
+            # Calculate the relative speed and adjust the text depending on avalable space
+                                 
+        pygame.draw.rect(controls, controlsBgColor, self.rect) # Paint over any old text
+        text = font.render(text, textColor)[0] # Render text
+        textpos = center(self.rect, text) # Center text
+        controls.blit(text, textpos) # Place text on control panel
         
-scrol_bar = Scrol_bar((138, 8), (screenSize[0] - 138 - 8, 18)) 
-    # one scrol bar to specify lorens transfomrations
-text_display = Text_display((138, 8+18), (screenSize[0] - 138 - 8, 55-8-18))
+        
+scroll_bar = Scroll_bar((138, 8), (screenSize[0] - 138 - 8, 18)) 
+    # one scroll bar to specify Lorentz transformations
+    
+speed_display = Speed_display((138, 8+18), (screenSize[0] - 138 - 8, 55-8-18))
     # one text display to show the related velocity change
     
 
-controls = pygame.Surface(controls_size(screenSize))
-controls.fill(controlsBgColor)
 
+###################################################################
+# Draw the initial view
+ 
+screen = pygame.display.set_mode(screenSize, pygame.RESIZABLE)
+    # Creates the program window
+
+universe = Universe(universe_size(screenSize)) # create empty universe 
+universe.draw() # draws universe
+universe.show() # puts the univeres on screen
+
+controls.fill(controlsBgColor) # paints control panels bacground color
 for button in buttons: 
     button.draw() # draws button
-    
-scrol_bar.draw(0) # draws scrol bare, with the handle in the center.
+scroll_bar.draw(0) # draws scroll bare, with the handle in the center.
+screen.blit(controls, controlsPos) # put controls on screen
 
-screen.blit(controls, controlsPos)
-
-
-universe = Universe(universe_size(screenSize)) # create empty 
-universe.draw() # draws universe
-screen.blit(universe.surface, universePos) # put on screen
-
-pygame.display.flip() # make all appear on screen
+pygame.display.flip() # update window
 
 
 ###################################################################
@@ -401,62 +529,166 @@ pygame.display.flip() # make all appear on screen
 clock = pygame.time.Clock() # clock to have clock-ticks, to save on CPU
 
 running = True # Is program running? Assign "False" to quit.
-is_drawing_line = False # Is the user in the middle of drawin a line?
-shift_is_down = False # the shift key is down
-last_pos = (-1, -1) # pos for last MOUSEMOTION event. Put initial outside screen
-last_save_or_load = None
 
-def remove(universe, pos):
-    coord = pixel_to_spacetime(universe, pos)
-    for point in universe.points:
-        point_coord = point.in_other_frame(universe.frame)
-        dist_sq = (coord[0] - point_coord[0])**2 + (coord[1] - point_coord[1])**2
-        if dist_sq <= pointRadius**2:
-            universe.points.remove(point)
-            return 1
-            
-    for line in universe.lines:
-        line_coords = line.in_other_frame(universe.frame) 
-        if line_coords[1][0] - line_coords[0][0] == 0:
-            if (coord[0] - line_coords[0][0] <= lineWidth/2
-                and coord[1] <= max(line_coords[0][1], line_coords[1][1])
-                and coord[1] >= min(line_coords[0][1], line_coords[1][1])):
-                universe.lines.remove(line)
-                return 2
-        
-        elif (coord[0] <= max(line_coords[0][0], line_coords[1][0]) + lineWidth/2
-            and coord[0] >= min(line_coords[0][0], line_coords[1][0]) - lineWidth/2
-            and abs(coord[1] - (line_coords[0][1] + (coord[0] - line_coords[0][0])*(line_coords[1][1] - line_coords[0][1])/(line_coords[1][0] - line_coords[0][0]))) <= lineWidth/2):
-            universe.lines.remove(line)
-            return 2
-    return 0      
-            
-def straighten_line(start, end):
-    dx = end[0] - start[0]
-    dy = end[1] - start[1]
-    if abs(dx) < abs(dy)/2:
-        return start[0], end[1]
-    elif abs(dy) < abs(dx)/2:
-        return end[0], start[1]
-    else: 
-        dx = copysign(dy,dx)
-        return start[0] + dx, end[1]
 
-def in_the_universe(pos):
+# Global trackers that needs to be updated from inside functions
+class Global():
+    pass
+
+gl = Global()
+
+gl.is_drawing_line = False # True iff the user in the middle of drawing a line
+gl.shift_key_is_down = False # True if the shift key is down
+gl.last_pos = (-1, -1) # pos for last MOUSEMOTION event. Put initialy outside screen
+gl.last_save_or_load = None # Name of last name file the session is saved or loaded as
+gl.start = None # Starting point of line
+
+
+
+def in_the_universe(pos): # Check if the point is in the universe
     return (universe.surface.get_rect(topleft=universePos).collidepoint(pos)
             and not menu_rect.collidepoint(pos) )
+
+
+def left_click_in_menu(pos):
+    for button in menu_list:
+        if button.rect.collidepoint(pos):
+            button.do()
+         
+ 
+def left_click_in_the_universe(pos):
+    if pointButton.is_active:
+        make_point(universe, pos) # make point there
+        pygame.draw.circle(screen, pointColor, pos, pointRadius)
+            # draw the point
+        
+    elif lineButton.is_active:
+        if not gl.is_drawing_line: # not already marked start of line
+            gl.start = pos # remember start of line
+            gl.is_drawing_line = True # drawing in progress 
+        else:
+            end = pos
+            if gl.shift_key_is_down:
+                end = straighten_line(gl.start, end)
+            make_line(universe, (gl.start, end))
+            gl.is_drawing_line = False # line is now done
+            # no need to draw the line, because it is already there
+            
+    elif removeButton.is_active:
+        remove(universe, pos) # remove anything that is clicked on
+        universe.draw() # redraw universe
+        universe.show()
+            
     
-def my_round(frac):
-    if abs(frac) < 90:
-        return round(frac)
-    if abs(frac) < 99:
-        return round(frac,1)
-    if abs(frac) < 99.9:
-        return round(frac,2)#
-    return round(frac, 2-ceil(log10(100-abs(frac))))
+def left_click_on_the_controls(pos):
+
+    if scroll_bar.handle.move(controlsPos).collidepoint(pos): 
+        # click on scroll bar handle
+        scroll_bar.is_grabed = True
+        scroll_bar.grab_pos = pos[0] # save x-pos of where it was garbed
+        return
+
+    for button in buttons: # loop all buttons
+        if button.rect.move(controlsPos).collidepoint(pos): 
+                # check if we are on this button
+            button.is_active = not button.is_active # change is active
+            button.draw() # re-draw button
+            
+            if button in drawingOptions:
+                for other_button in drawingOptions:
+                    if other_button != button:
+                        other_button.is_active = False
+                        other_button.draw() 
+                # can't have more than one of this active at the same time
+            
+            if gl.is_drawing_line:
+                gl.is_drawing_line = False # interrupts any half finished line
+                universe.show() # paint over half finished line
+                
+            screen.blit(controls, controlsPos)    
+            break # no need to check other buttons
+            
+            
+def right_ckick(): 
+    # the "never mind" action. Interupts what ever is about to happen
+
+    if gl.is_drawing_line: # interrupts any half finished line
+        gl.is_drawing_line = False 
+        universe.show() # paint over half finished line
+    
+    elif scroll_bar.is_grabed: # interrupts any Lorentz transformation
+        scroll_bar.is_grabed = False # dropp scroll bar
+        
+        scroll_bar.draw(0) 
+        speed_display.hide()
+        screen.blit(controls, controlsPos)
+        universe.draw() # restore
+        universe.show() # redraw
+        
+    elif clearButton.is_active:
+        clearButton.is_active = False # reset button
+        clearButton.draw() # redraw button
+        screen.blit(controls, controlsPos)
+        
+        
+def left_mouse_button_up(pos): # finalizes clear or scroll
+        
+    if clearButton.is_active:
+        universe.clear() # clear universe
+        universe.draw() # redraw universe
+        
+        universe.show() # paint over half finished line
+        clearButton.is_active = False # reset button
+        clearButton.draw() # redraw button
+        screen.blit(controls, controlsPos)
+    
+    elif scroll_bar.is_grabed: # finalizes any Lorentz transformation
+        scroll_bar.is_grabed = False
+        scroll_bar.draw(0)
+        universe.frame += 0.01 * (pos[0] - scroll_bar.grab_pos)
+        speed_display.hide()
+        screen.blit(controls, controlsPos)
+        
+        
+def mouse_motion(pos):
+    if scroll_bar.is_grabed:
+        shift = pos[0] - scroll_bar.grab_pos
+        if shift < -scroll_bar.max:
+            shift = -scroll_bar.max
+        elif shift > scroll_bar.max:
+            shift = scroll_bar.max    
+        
+        universe.draw_in_frame(universe.frame + 0.01 * shift)
+        universe.show()      
+            
+        scroll_bar.draw(shift)
+        speed_display.show(shift)
+        screen.blit(controls, controlsPos)
+        
+    else:     
+        if gl.is_drawing_line:
+            if in_the_universe(pos):
+                end = pos
+                if gl.shift_key_is_down:
+                    end = straighten_line(gl.start, end)
+                universe.show() 
+                color = line_color((gl.start, end))
+                pygame.draw.line(screen, color, gl.start, end, lineWidth)
+                
+            elif in_the_universe(gl.last_pos):
+                universe.show()
+                
+        if menu_rect.collidepoint(pos):
+            draw_menu(pos)
+            
+        elif (not gl.is_drawing_line) and menu_rect.collidepoint(gl.last_pos):
+            universe.show()
+    
+    gl.last_pos = pos
+
 
 while running:
-    for event in pygame.event.get(): # what the user is dooing
+    for event in pygame.event.get(): # what the user is doing
         if event.type == pygame.QUIT:
             #pygame.display.quit() # close window
             running = False # time to stop running program
@@ -465,177 +697,49 @@ while running:
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             # a left click
         
-            if menu_dict["Help"].rect.collidepoint(event.pos):
-                help()
-                
-            elif menu_dict["Save"].rect.collidepoint(event.pos):
-                save()
-                
-            elif menu_dict["Load"].rect.collidepoint(event.pos):
-                load()
-                
-            elif menu_dict["Show/Hide lightcone"].rect.collidepoint(event.pos):
-                universe.show_lightcone = not universe.show_lightcone
-                universe.draw()
-                screen.blit(universe.surface, universePos)
-                draw_menu(event.pos)
+            if menu_rect.collidepoint(event.pos): # click in menu
+                left_click_in_menu(event.pos) 
         
-            elif in_the_universe(event.pos): 
-                # a click in universe
-                     
-                if pointButton.is_active:
-                    make_point(universe, event.pos) # make point there
-                    pygame.draw.circle(screen, pointColor, event.pos, pointRadius)
-                        # draw the point
-                    
-                elif lineButton.is_active:
-                    if is_drawing_line: # already makred start of line
-                        end = event.pos
-                        if shift_is_down:
-                            end = straighten_line(start, end)
-                        make_line(universe, (start, end))
-                        is_drawing_line = False # line is now done
-                    else:
-                        start = event.pos # remember start of line
-                        is_drawing_line = True # drawing in progress 
-                        
-                elif removeButton.is_active:
-                    remove(universe, event.pos) # not finnished!
-                    universe.draw()
-                    screen.blit(universe.surface, universePos)
-                    
-            elif scrol_bar.handle.move(controlsPos).collidepoint(event.pos): 
-                # click on scrol bar handle
-                scrol_bar.is_grabed = True
-                grab_pos = event.pos[0] # save x-pos of where it was grabed
-                shift = 0 # not draged yet
-                    
-            else: # click some where else
-                for button in buttons: # loop all buttons
-                    if button.rect.move(controlsPos).collidepoint(event.pos): 
-                            # chek if we are on this button
-                        button.is_active = not button.is_active # change is active
-                        button.draw() # re-draw button
-                        
-                        if button in drawingOptions:
-                            for other_button in drawingOptions:
-                                if other_button != button:
-                                    other_button.is_active = False
-                                    other_button.draw() 
-                            # can't have more than one of this accitve at the same time
-                        
-                        if is_drawing_line:
-                            is_drawing_line = False # interups any half finiched line
-                            screen.blit(universe.surface, universePos) # paint over half finiched line
-                        screen.blit(controls, controlsPos)    
-                        break # no need to check other buttons
-                        
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3: # a right click
-        
-            if is_drawing_line: # interups any half finiche line
-                is_drawing_line = False 
-                screen.blit(universe.surface, universePos) # paint over half finiched line
-            
-            if scrol_bar.is_grabed: # interupts any lorentz transformation
-                scrol_bar.is_grabed = False 
-                scrol_bar.draw(0)
-                text_display.hide()
-                screen.blit(controls, controlsPos)
+            elif in_the_universe(event.pos): # a click in universe
+                left_click_in_the_universe(event.pos)
                 
-                universe.draw()
-                screen.blit(universe.surface, universePos) # paint over half finiched line
+            else: # a click on the controls
+                left_click_on_the_controls(event.pos)        
+                        
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3: 
+            right_click()
                                
-        elif event.type == pygame.MOUSEBUTTONUP:
-            if clearButton.is_active:
-                universe.clear() # celar universe
-                universe.draw() # re-draw universe
-                
-                screen.blit(universe.surface, universePos) # paint over half finiched line
-                clearButton.is_active = False # reset button
-                clearButton.draw() # re-draw button
-                screen.blit(controls, controlsPos)
-            
-            elif scrol_bar.is_grabed: # finalizes any lorentz transformation
-                scrol_bar.is_grabed = False
-                scrol_bar.draw(0)
-                universe.frame += 0.01 * shift
-                text_display.hide()
-                screen.blit(controls, controlsPos)
+        elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+            left_mouse_button_up(event.pos)
                     
-        elif event.type == pygame.MOUSEMOTION: 
-        
-            if scrol_bar.is_grabed:
-                shift = event.pos[0] - grab_pos
-                if shift < -scrol_bar.max:
-                    shift = -scrol_bar.max
-                elif shift > scrol_bar.max:
-                    shift = scrol_bar.max    
-                
-                universe.draw_in_frame(universe.frame + 0.01 * shift)
-                screen.blit(universe.surface, universePos)      
-                    
-                scrol_bar.draw(shift)
-                
-                
-                
-                if text_display.rect.width < 130:
-                    text_display.display(str(my_round(100 * tanh(0.01 * shift)))
-                                         + "% c")
-                                             
-                elif text_display.rect.width < 290:
-                    text_display.display(str(my_round(100 * tanh(0.01 * shift)))
-                                         + "% of light speed")
-                else:         
-                    text_display.display("Instantly accelerate to "
-                                         + str(my_round(100 * tanh(0.01 * shift)))
-                                         + "% of light speed.")
-                screen.blit(controls, controlsPos)                 
-            
-            elif is_drawing_line:
-                if in_the_universe(event.pos):
-                    end = event.pos
-                    if shift_is_down:
-                        end = straighten_line(start, end)
-                    screen.blit(universe.surface, universePos) 
-                    color = line_color((start, end))
-                    pygame.draw.line(screen, color, start, end, lineWidth)
-                    
-                elif in_the_universe(last_pos):
-                    screen.blit(universe.surface, universePos)
-                    
-            if menu_rect.collidepoint(event.pos):
-                draw_menu(event.pos)
-                
-            elif not is_drawing_line and menu_rect.collidepoint(last_pos):
-                screen.blit(universe.surface,universePos)
-            
-            last_pos = event.pos      
+        elif event.type == pygame.MOUSEMOTION:
+            mouse_motion(event.pos)      
 
                                      
         elif event.type == pygame.KEYDOWN and (event.key == pygame.K_LSHIFT
-                                            or event.key == pygame.K_RSHIFT):
-            shift_is_down = True
-            if is_drawing_line:
-                end = straighten_line(start, end)
-                screen.blit(universe.surface, universePos)
-                color = line_color((start, end))
-                pygame.draw.line(screen, color, start, end, lineWidth)
+                                                or event.key == pygame.K_RSHIFT):
+            gl.shift_key_is_down = True
+            if gl.is_drawing_line:
+                end = straighten_line(gl.start, pygame.mouse.get_pos())
+                universe.show()
+                color = line_color((gl.start, end))
+                pygame.draw.line(screen, color, gl.start, end, lineWidth)
                 
         elif event.type == pygame.KEYUP and (event.key == pygame.K_LSHIFT
                                             or event.key == pygame.K_RSHIFT):
-            shift_is_down = False
-            if is_drawing_line:
+            gl.shift_key_is_down = False
+            if gl.is_drawing_line:
                 end = pygame.mouse.get_pos()
-                screen.blit(universe.surface, universePos)
-                color = line_color((start, end))
-                pygame.draw.line(screen, color, start, end, lineWidth)
+                universe.show()
+                color = line_color((gl.start, end))
+                pygame.draw.line(screen, color, gl.start, end, lineWidth)
                 
         elif event.type == pygame.VIDEORESIZE: # resize window
             screen = pygame.display.set_mode(event.size, pygame.RESIZABLE)
 
             universe.surface = pygame.Surface(universe_size(event.size))
             universe.draw()
-            screen.blit(universe.surface, universePos)          
+            universe.show()          
             
             controlsPos = controls_pos(event.size)
             controls = pygame.Surface(controls_size(event.size))
@@ -643,13 +747,13 @@ while running:
             for button in buttons: 
                 button.draw() # draws button
                 
-            scrol_bar = Scrol_bar((138, 8), (event.size[0] - 138 - 8, 18)) 
-            text_display = Text_display((138, 8+18), (event.size[0] - 138 - 8, 55-8-18))
-            scrol_bar.draw(0) # draws scrol bare, with the handle in the center.
+            scroll_bar = Scroll_bar((138, 8), (event.size[0] - 138 - 8, 18)) 
+            speed_display = Speed_display((138, 8+18), (event.size[0] - 138 - 8, 55-8-18))
+            scroll_bar.draw(0) # draws scroll bare, with the handle in the center.
             screen.blit(controls, controlsPos)        
 
-        pygame.display.flip() # show changes    
-        
+  
+    pygame.display.flip() # show changes    
     clock.tick(120) # to save on CPU use
 
 
