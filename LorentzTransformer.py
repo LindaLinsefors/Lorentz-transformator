@@ -142,14 +142,14 @@ class Universe:
         for line in self.lines:
             coords = line.in_other_frame(frame)
                 # convert to specified Lorentz frame
-            pos = tuple(space_time_to_pixel(self, coord) 
+            pos = tuple(spacetime_to_pixel(self, coord) 
                         for coord in coords)
                 # converts to pixel position
             pygame.draw.line(self.surface, line.color(), pos[0], pos[1], lineWidth)
                     
         for point in self.points:
             coord = point.in_other_frame(frame)           
-            pos = space_time_to_pixel(self, coord)
+            pos = spacetime_to_pixel(self, coord)
             pygame.draw.circle(self.surface, pointColor, pos, pointRadius)
 
         
@@ -162,9 +162,8 @@ class Universe:
         
 def Lorentz_transform(coord, frame_diff): 
     sh, ch = sinh(frame_diff), cosh(frame_diff)
-    t, r = coord  
-    return (ch*t - sh*r, 
-           -sh*t + ch*r)
+    r, t = coord  
+    return ch*r -sh*t, ch*t - sh*r
     
 
 class Point:
@@ -208,20 +207,20 @@ class Line:
 ##################################################################
 # Relating position on the screen with coordinates in the Universe
 
-def pixel_to_space_time(universe, pos):
+def pixel_to_spacetime(universe, pos):
     ''' takes pixel position on the screen and gives 
     space-time coordinates in the universe '''
     origo = universe.get_origo()
-    t = -(pos[0] - origo[0]) # time coordinate
-    r = pos[1] - origo[1] # space coordinate
-    return t, r
+    r = pos[0] - origo[0] # space coordinate
+    t = -(pos[1] - origo[1]) # time coordinate
+    return r, t
     
-def space_time_to_pixel(universe, coord):
+def spacetime_to_pixel(universe, coord):
     ''' takes space-time coordinates in universe
     and gives pixel coordinates on universe.surface '''
     origo = universe.get_origo_on_screen()
-    x = int(round(origo[0] - coord[0]))
-    y = int(round(origo[1] + coord[1]))
+    x = int(round(origo[0] + coord[0]))
+    y = int(round(origo[1] - coord[1]))
     return x, y
 
 
@@ -230,14 +229,14 @@ def space_time_to_pixel(universe, coord):
 
 def make_point(universe, pos):
     # takes the pixel position of a point, and makes a point object  
-    point = Point(universe.frame, pixel_to_space_time(universe, pos) )
+    point = Point(universe.frame, pixel_to_spacetime(universe, pos) )
     universe.points.append(point) # adds object to universe content
     universe.draw() # update picture of universe
     return point 
             
 def make_line(universe, pos):
     # takes a tuple of two pixel positions and makes a Line object
-    coords = tuple(pixel_to_space_time(universe, point) 
+    coords = tuple(pixel_to_spacetime(universe, point) 
                    for point in pos) # convert to space-time coordinates
     line = Line(universe.frame, coords)
     universe.lines.append(line) # adds object to list
@@ -261,7 +260,7 @@ def straighten_line(start, end):
 def remove(universe, pos):
     ''' removes any point or line in the universe that are on position pos'''
      
-    coord = pixel_to_space_time(universe, pos)
+    coord = pixel_to_spacetime(universe, pos)
     for point in universe.points:
         point_coord = point.in_other_frame(universe.frame)
         dist_sq = (coord[0] - point_coord[0])**2 + (coord[1] - point_coord[1])**2
@@ -271,22 +270,23 @@ def remove(universe, pos):
             
     for line in universe.lines:
         line_coords = line.in_other_frame(universe.frame) 
-        if line_coords[1][0] - line_coords[0][0] == 0:
-            if (coord[0] - line_coords[0][0] <= lineWidth/2
+        if line_coords[1][0] - line_coords[0][0] == 0: # a vertical line
+            if (    abs(coord[0] - line_coords[0][0]) <= lineWidth/2
                 and coord[1] <= max(line_coords[0][1], line_coords[1][1])
                 and coord[1] >= min(line_coords[0][1], line_coords[1][1])):
+                
                 universe.lines.remove(line)
                 return 2 # This return value means that a line was removed
         
-        elif (coord[0] <= max(line_coords[0][0], line_coords[1][0]) + lineWidth/2
-            and coord[0] >= min(line_coords[0][0], line_coords[1][0]) - lineWidth/2
-            and abs(coord[1] 
-                    - (line_coords[0][1] 
-                    + (coord[0] - line_coords[0][0])*(line_coords[1][1] - line_coords[0][1])/(line_coords[1][0] - line_coords[0][0]))
-                   ) <= lineWidth/2
-             ):
-            universe.lines.remove(line)
-            return 2 # This return value means that a line was removed
+        else: # not a vertical line
+            slope = (line_coords[1][1] - line_coords[0][1])/(line_coords[1][0] - line_coords[0][0])
+            if (    coord[0] <= max(line_coords[0][0], line_coords[1][0]) + lineWidth/2
+                and coord[0] >= min(line_coords[0][0], line_coords[1][0]) - lineWidth/2
+                and abs(coord[1] - (line_coords[0][1] + slope * (coord[0] - line_coords[0][0]))) <= lineWidth/2):
+                
+                universe.lines.remove(line)
+                return 2 # This return value means that a line was removed
+                
     return 0 # This return value means that noting was removed  
     
 
@@ -546,7 +546,7 @@ gl.start = None # Starting point of line
 
 
 def in_the_universe(pos): # Check if the point is in the universe
-    return (universe.surface.get_rect(topleft=universePos).collidepoint(pos)
+    return (universe.surface.get_rect(topleft = universePos).collidepoint(pos)
             and not menu_rect.collidepoint(pos) )
 
 
@@ -609,7 +609,7 @@ def left_click_on_the_controls(pos):
             break # no need to check other buttons
             
             
-def right_ckick(): 
+def right_click(): 
     # the "never mind" action. Interupts what ever is about to happen
 
     if gl.is_drawing_line: # interrupts any half finished line
