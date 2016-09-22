@@ -50,9 +50,9 @@ In the top left corner is a hidden menu, that will appear if you hover the mouse
     
     "Show/Hide light-cone" - click and find out.
 
-Sessions are saved as .lor files in the "Saves" folder. You can share your saved sessions with others, by copying the .lor file in to their "saves" folder.
+Sessions are saved as .lor files in the 'Saves' folder. You can share your saved sessions with others, by copying the .lor file in to their 'Saves' folder.
 
-The "Saves" folder should be in the same location on you computer as the LorentzTransrormer. If the folder does not exit, a new one will be created when you save a session.
+The 'Saves' folder should be in the same location on you computer as the LorentzTransrormer. If the folder does not exit, a new one will be created when you save a session.
 
 
 
